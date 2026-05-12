@@ -6,6 +6,25 @@ import type { ContactContent } from "../data/content";
 import { fetchChatMessages, getChatSessionId, sendChatMessage, subscribeToChatMessages } from "../data/chat";
 import type { ChatMessage } from "../data/chat";
 
+type MemberProfile = {
+  name?: string;
+  email?: string;
+};
+
+const MEMBER_PROFILE_KEY = "quartz_member_profile";
+
+const canUseStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+const readMemberProfile = (): MemberProfile | null => {
+  if (!canUseStorage()) return null;
+  try {
+    const raw = localStorage.getItem(MEMBER_PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as MemberProfile) : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function ContactPage({ content }: { content: ContactContent }) {
   const sessionId = useMemo(() => getChatSessionId(), []);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -45,10 +64,13 @@ export default function ContactPage({ content }: { content: ContactContent }) {
       setError("Chat session unavailable. Refresh and try again.");
       return;
     }
+    const profile = readMemberProfile();
+    const name = profile?.name?.trim() || profile?.email?.split("@")[0] || "Guest";
+    const email = profile?.email?.trim() || "";
     const ok = await sendChatMessage({
       sessionId,
-      name: "Guest",
-      email: "",
+      name,
+      email,
       message: trimmed,
       sender: "visitor",
     });

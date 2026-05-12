@@ -14,6 +14,13 @@ const ADMIN_ENDPOINT = "/api/admin-login";
 
 type AdminSection = "products" | "collections" | "orders" | "customers" | "content" | "chat";
 
+type OrderLineItem = {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+};
+
 type Order = {
   id: string;
   customer: string;
@@ -22,6 +29,7 @@ type Order = {
   payment?: string;
   total: number;
   items: number;
+  lineItems?: OrderLineItem[];
   status: "Pending" | "Processing" | "Shipped" | "Delivered";
   date: string;
 };
@@ -44,6 +52,9 @@ const initialOrders: Order[] = [
     payment: "BTC",
     total: 1480,
     items: 1,
+    lineItems: [
+      { id: 1, name: "Aurum Chronograph", quantity: 1, price: 1480 },
+    ],
     status: "Processing",
     date: "2026-04-28T14:12:00Z",
   },
@@ -55,6 +66,9 @@ const initialOrders: Order[] = [
     payment: "USDC",
     total: 920,
     items: 1,
+    lineItems: [
+      { id: 2, name: "Noir Tailored Coat", quantity: 1, price: 920 },
+    ],
     status: "Pending",
     date: "2026-04-30T10:44:00Z",
   },
@@ -66,6 +80,10 @@ const initialOrders: Order[] = [
     payment: "ETH",
     total: 1820,
     items: 2,
+    lineItems: [
+      { id: 5, name: "Solstice Ring", quantity: 1, price: 1180 },
+      { id: 8, name: "Orion Chain Bracelet", quantity: 1, price: 640 },
+    ],
     status: "Shipped",
     date: "2026-05-02T19:08:00Z",
   },
@@ -77,6 +95,9 @@ const initialOrders: Order[] = [
     payment: "LTC",
     total: 475,
     items: 1,
+    lineItems: [
+      { id: 9, name: "Carbon Derby", quantity: 1, price: 475 },
+    ],
     status: "Delivered",
     date: "2026-05-04T16:25:00Z",
   },
@@ -661,6 +682,21 @@ export default function AdminPage() {
                         <p className="text-lg text-white">${order.total.toLocaleString()}</p>
                         <p>Payment: <span className="text-white/80">{order.payment || "Not selected"}</span></p>
                         <p>Ship to: <span className="text-white/80">{order.address || "No address provided"}</span></p>
+                        {order.lineItems && order.lineItems.length > 0 ? (
+                          <div className="mt-3">
+                            <p className="text-[10px] uppercase tracking-[0.22em] text-white/45">Items</p>
+                            <div className="mt-2 grid gap-1">
+                              {order.lineItems.map((item) => (
+                                <div key={`${order.id}-${item.id}`} className="flex items-center justify-between text-xs text-white/70">
+                                  <span>{item.name} x{item.quantity}</span>
+                                  <span>${(item.price * item.quantity).toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p>Items: <span className="text-white/80">{order.items}</span></p>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-3 text-right text-sm text-white/45 md:items-start md:text-left">
                         <select

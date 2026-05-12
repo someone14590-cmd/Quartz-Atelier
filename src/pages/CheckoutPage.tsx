@@ -9,6 +9,13 @@ type MemberProfile = {
   email?: string;
 };
 
+type OrderLineItem = {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+};
+
 type Order = {
   id: string;
   customer: string;
@@ -17,6 +24,7 @@ type Order = {
   payment: string;
   total: number;
   items: number;
+  lineItems?: OrderLineItem[];
   status: "Pending" | "Processing" | "Shipped" | "Delivered";
   date: string;
 };
@@ -97,6 +105,12 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
       payment,
       total,
       items: cart.reduce((sum, item) => sum + item.quantity, 0),
+      lineItems: cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
       status: "Pending",
       date: new Date().toISOString(),
     };
@@ -165,7 +179,7 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
             <select
               value={payment}
               onChange={(event) => setPayment(event.target.value as (typeof PAYMENT_OPTIONS)[number])}
-              className="form-input text-white/70"
+              className="form-input form-select text-white/80"
               aria-label="Payment method"
             >
               {PAYMENT_OPTIONS.map((option) => (
