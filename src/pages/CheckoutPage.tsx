@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { CartItem } from "../data/products";
-import { emitStorefrontUpdate, STORAGE_KEYS } from "../data/storefront";
+import { emitStorefrontUpdate, loadShippingCharge, STORAGE_KEYS, STOREFRONT_UPDATE_EVENT } from "../data/storefront";
 
 type MemberProfile = {
   name?: string;
@@ -75,12 +75,24 @@ const createOrderId = (orders: Order[]): string => {
 
 export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setCart: (cart: CartItem[]) => void }) {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const total = subtotal ? subtotal + 35 : 0;
+  const [shippingCharge, setShippingCharge] = useState(() => loadShippingCharge());
+  const shippingCost = subtotal ? shippingCharge : 0;
+  const total = subtotal ? subtotal + shippingCharge : 0;
   const [address, setAddress] = useState("");
   const [payment, setPayment] = useState<(typeof PAYMENT_OPTIONS)[number]>(PAYMENT_OPTIONS[0]);
   const [formError, setFormError] = useState("");
   const remove = (id: number) => setCart(cart.filter((item) => item.id !== id));
   const update = (id: number, quantity: number) => setCart(cart.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)));
+
+  useEffect(() => {
+    const syncShipping = () => setShippingCharge(loadShippingCharge());
+    window.addEventListener("storage", syncShipping);
+    window.addEventListener(STOREFRONT_UPDATE_EVENT, syncShipping);
+    return () => {
+      window.removeEventListener("storage", syncShipping);
+      window.removeEventListener(STOREFRONT_UPDATE_EVENT, syncShipping);
+    };
+  }, []);
 
   const submitOrder = (event: FormEvent) => {
     event.preventDefault();
@@ -162,7 +174,7 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
           <h2 className="text-2xl text-white">Order Summary</h2>
           <div className="mt-6 grid gap-3 border-b border-white/10 pb-6 text-white/60">
             <div className="flex justify-between"><span>Subtotal</span><span>${subtotal.toLocaleString()}</span></div>
-            <div className="flex justify-between"><span>Insured shipping</span><span>{subtotal ? "$35" : "$0"}</span></div>
+            <div className="flex justify-between"><span>Insured shipping</span><span>${shippingCost.toLocaleString()}</span></div>
             <div className="flex justify-between text-white"><span>Total</span><span>${total.toLocaleString()}</span></div>
           </div>
           <div className="mt-6 grid gap-3">

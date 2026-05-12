@@ -10,9 +10,12 @@ export const STORAGE_KEYS = {
   contact: "quartz_admin_contact",
   orders: "quartz_admin_orders",
   customers: "quartz_admin_customers",
+  shipping: "quartz_admin_shipping",
 };
 
 export const STOREFRONT_UPDATE_EVENT = "quartz:storefront-update";
+
+export const DEFAULT_SHIPPING_CHARGE = 35;
 
 export const emitStorefrontUpdate = () => {
   if (typeof window === "undefined") return;
@@ -43,3 +46,5 @@ export const loadCollections = (): Collection[] => cloneCollections(readLocal(ST
 export const loadAboutContent = (): AboutContent => cloneContent(readLocal(STORAGE_KEYS.about, aboutContent));
 
 export const loadContactContent = (): ContactContent => cloneContent(readLocal(STORAGE_KEYS.contact, contactContent));
+
+export const loadShippingCharge = (): number => readLocal(STORAGE_KEYS.shipping, DEFAULT_SHIPPING_CHARGE);

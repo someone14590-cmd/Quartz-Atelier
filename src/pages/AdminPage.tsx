@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { aboutContent, contactContent } from "../data/content";
 import { categories, collections, products } from "../data/products";
 import type { Collection, Product } from "../data/products";
-import { emitStorefrontUpdate, loadAboutContent, loadCollections, loadContactContent, loadProducts, STORAGE_KEYS, STOREFRONT_UPDATE_EVENT } from "../data/storefront";
+import { DEFAULT_SHIPPING_CHARGE, emitStorefrontUpdate, loadAboutContent, loadCollections, loadContactContent, loadProducts, loadShippingCharge, STORAGE_KEYS, STOREFRONT_UPDATE_EVENT } from "../data/storefront";
 import { fetchChatMessages, markVisitorMessagesRead, sendChatMessage, subscribeToChatMessages } from "../data/chat";
 import type { ChatMessage } from "../data/chat";
 
@@ -160,9 +160,11 @@ export default function AdminPage() {
   const [collectionDrafts, setCollectionDrafts] = useState<Collection[]>(() => loadCollections());
   const [orders, setOrders] = useState<Order[]>(() => readLocal(STORAGE_KEYS.orders, initialOrders));
   const [customers, setCustomers] = useState<Customer[]>(() => readLocal(STORAGE_KEYS.customers, initialCustomers));
+  const [shippingCharge, setShippingCharge] = useState(() => loadShippingCharge());
   const [aboutDraft, setAboutDraft] = useState(loadAboutContent());
   const [contactDraft, setContactDraft] = useState(loadContactContent());
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [adminReply, setAdminReply] = useState("");
   const [chatError, setChatError] = useState("");
@@ -204,6 +206,7 @@ export default function AdminPage() {
     setContactDraft(loadContactContent());
     setOrders(readLocal(STORAGE_KEYS.orders, initialOrders));
     setCustomers(readLocal(STORAGE_KEYS.customers, initialCustomers));
+    setShippingCharge(loadShippingCharge());
   }, []);
 
   useEffect(() => {
@@ -219,6 +222,10 @@ export default function AdminPage() {
   const refreshChat = async () => {
     const data = await fetchChatMessages("admin");
     setChatMessages(data);
+  };
+
+  const toggleOrderItems = (orderId: string) => {
+    setExpandedOrders((current) => ({ ...current, [orderId]: !current[orderId] }));
   };
 
   useEffect(() => {
@@ -353,6 +360,7 @@ export default function AdminPage() {
       localStorage.setItem(STORAGE_KEYS.contact, JSON.stringify(contactDraft));
       localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
       localStorage.setItem(STORAGE_KEYS.customers, JSON.stringify(customers));
+      localStorage.setItem(STORAGE_KEYS.shipping, JSON.stringify(shippingCharge));
       emitStorefrontUpdate();
       pushNotice("Drafts saved locally.");
     } catch {
@@ -421,12 +429,14 @@ export default function AdminPage() {
     setContactDraft(contactContent);
     setOrders(initialOrders);
     setCustomers(initialCustomers);
+    setShippingCharge(DEFAULT_SHIPPING_CHARGE);
     localStorage.removeItem(STORAGE_KEYS.products);
     localStorage.removeItem(STORAGE_KEYS.collections);
     localStorage.removeItem(STORAGE_KEYS.about);
     localStorage.removeItem(STORAGE_KEYS.contact);
     localStorage.removeItem(STORAGE_KEYS.orders);
     localStorage.removeItem(STORAGE_KEYS.customers);
+    localStorage.removeItem(STORAGE_KEYS.shipping);
     emitStorefrontUpdate();
     pushNotice("Drafts reset.");
   };
@@ -669,6 +679,24 @@ export default function AdminPage() {
                 <p className="eyebrow">Operations</p>
                 <h2 className="text-3xl font-semibold text-white">Orders</h2>
                 <div className="mt-6 grid gap-4">
+                  <div className="border border-gold/12 bg-white/[0.03] p-5">
+                    <p className="text-xs uppercase tracking-[0.24em] text-white/50">Shipping Charge</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr] md:items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={shippingCharge}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          setShippingCharge(Number.isFinite(value) ? Math.max(0, value) : 0);
+                        }}
+                        className="form-input"
+                        aria-label="Shipping charge"
+                      />
+                      <p className="text-sm text-white/55">Applies to new checkout totals. Save Drafts to publish.</p>
+                    </div>
+                  </div>
                   {orders.map((order) => (
                     <div key={order.id} className="grid gap-4 border border-gold/12 bg-white/[0.03] p-5 md:grid-cols-[1.1fr_1fr_180px]">
                       <div>
@@ -682,9 +710,15 @@ export default function AdminPage() {
                         <p className="text-lg text-white">${order.total.toLocaleString()}</p>
                         <p>Payment: <span className="text-white/80">{order.payment || "Not selected"}</span></p>
                         <p>Ship to: <span className="text-white/80">{order.address || "No address provided"}</span></p>
-                        {order.lineItems && order.lineItems.length > 0 ? (
-                          <div className="mt-3">
-                            <p className="text-[10px] uppercase tracking-[0.22em] text-white/45">Items</p>
+                        <button
+                          type="button"
+                          onClick={() => toggleOrderItems(order.id)}
+                          className="mt-2 text-left text-[10px] uppercase tracking-[0.22em] text-gold/80 hover:text-gold"
+                        >
+                          {expandedOrders[order.id] ? "Hide items" : `Items (${order.items})`}
+                        </button>
+                        {expandedOrders[order.id] && (
+                          order.lineItems && order.lineItems.length > 0 ? (
                             <div className="mt-2 grid gap-1">
                               {order.lineItems.map((item) => (
                                 <div key={`${order.id}-${item.id}`} className="flex items-center justify-between text-xs text-white/70">
@@ -693,9 +727,9 @@ export default function AdminPage() {
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        ) : (
-                          <p>Items: <span className="text-white/80">{order.items}</span></p>
+                          ) : (
+                            <p className="text-xs text-white/50">No item details available.</p>
+                          )
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-3 text-right text-sm text-white/45 md:items-start md:text-left">
