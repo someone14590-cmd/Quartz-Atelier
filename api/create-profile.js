@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       created_at: new Date(),
     });
 
-    res.status(200).json({ ok: true });
+    res.status(200).json({ ok: true, profile: { name: normalizedName, email: normalizedEmail } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, error: "Server error." });

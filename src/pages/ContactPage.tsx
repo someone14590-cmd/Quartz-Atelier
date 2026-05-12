@@ -10,11 +10,9 @@ export default function ContactPage({ content }: { content: ContactContent }) {
   const sessionId = useMemo(() => getChatSessionId(), []);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
-  const { hero, officeSection, form, inquiryOptions, direct, offices } = content;
+  const { hero, form, inquiryOptions, direct } = content;
 
   const orderedMessages = useMemo(
     () => [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
@@ -39,10 +37,8 @@ export default function ContactPage({ content }: { content: ContactContent }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = draft.trim();
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
-    if (!trimmedName || !trimmedEmail || !trimmed) {
-      setError("Add your name, email, and message.");
+    if (!trimmed) {
+      setError("Add a message to send.");
       return;
     }
     if (!sessionId) {
@@ -51,8 +47,8 @@ export default function ContactPage({ content }: { content: ContactContent }) {
     }
     const ok = await sendChatMessage({
       sessionId,
-      name: trimmedName,
-      email: trimmedEmail,
+      name: "Guest",
+      email: "",
       message: trimmed,
       sender: "visitor",
     });
@@ -75,37 +71,13 @@ export default function ContactPage({ content }: { content: ContactContent }) {
         </div>
       </section>
 
-      <section className="section-shell -mt-10 grid gap-10 lg:grid-cols-[1fr_480px]">
-        <div>
-          <p className="eyebrow">{officeSection.eyebrow}</p>
-          <h2 className="text-4xl font-semibold tracking-[-0.04em] text-white">{officeSection.title}</h2>
-          <div className="mt-10 grid gap-5">
-            {offices.map((office, i) => (
-              <motion.div
-                key={office.city}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: i * 0.1 }}
-                viewport={{ once: true }}
-                className="border border-gold/14 bg-white/[0.025] p-7 backdrop-blur-xl"
-              >
-                <h3 className="text-xl font-semibold text-white">{office.city}</h3>
-                <div className="mt-4 grid gap-2 text-sm text-white/50">
-                  <div className="flex items-center gap-3"><Icon name="pin" className="h-4 w-4 text-gold/70" /><span>{office.address}</span></div>
-                  <div className="flex items-center gap-3"><Icon name="phone" className="h-4 w-4 text-gold/70" /><span>{office.phone}</span></div>
-                  <div className="flex items-center gap-3"><Icon name="clock" className="h-4 w-4 text-gold/70" /><span>{office.hours}</span></div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
+      <section className="section-shell -mt-10">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
           viewport={{ once: true }}
-          className="h-fit border border-gold/18 bg-white/[0.035] p-7 backdrop-blur-xl"
+          className="mx-auto w-full max-w-4xl border border-gold/18 bg-white/[0.035] p-7 backdrop-blur-xl"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -116,7 +88,7 @@ export default function ContactPage({ content }: { content: ContactContent }) {
               Online
             </div>
           </div>
-          <div className="mt-6 max-h-[320px] space-y-3 overflow-y-auto border border-white/10 bg-black/30 p-4">
+          <div className="mt-6 min-h-[360px] max-h-[520px] space-y-3 overflow-y-auto border border-white/10 bg-black/30 p-4">
             {loadingMessages ? (
               <p className="text-sm text-white/45">Loading chat...</p>
             ) : orderedMessages.length === 0 ? (
@@ -138,16 +110,12 @@ export default function ContactPage({ content }: { content: ContactContent }) {
             )}
           </div>
           <form onSubmit={submit} className="mt-6 grid gap-4">
-            <div className="grid gap-3 md:grid-cols-2">
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" className="form-input" />
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" type="email" className="form-input" />
-            </div>
-            <select className="form-input text-white/60">
+            <select className="form-input bg-black text-white/80">
               {inquiryOptions.map((option) => (
-                <option key={option.value + option.label} value={option.value}>{option.label}</option>
+                <option key={option.value + option.label} value={option.value} className="bg-black text-white">{option.label}</option>
               ))}
             </select>
-            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} placeholder="Type your message" className="form-input resize-none" />
+            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={5} placeholder="Type your message" className="form-input resize-none" />
             {error && <p className="text-xs text-red-300">{error}</p>}
             <button className="gold-button mt-2" type="submit">Send Message</button>
           </form>
