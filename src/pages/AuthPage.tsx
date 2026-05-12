@@ -110,9 +110,31 @@ export default function AuthPage() {
         <div className="mt-10 grid gap-5 md:grid-cols-2">
           <form className="grid gap-4" onSubmit={submitSignIn}>
             <h2 className="text-2xl text-white">Sign In</h2>
-            <input className="form-input" placeholder="Email" type="email" value={signInEmail} onChange={(event) => setSignInEmail(event.target.value)} />
-            <input className="form-input" placeholder="Password" type="password" value={signInPassword} onChange={(event) => setSignInPassword(event.target.value)} />
-            {signInError && <p className="text-xs text-red-300">{signInError}</p>}
+            {signInError && (
+              <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                {signInError}
+              </div>
+            )}
+            <input
+              className="form-input"
+              placeholder="Email"
+              type="email"
+              value={signInEmail}
+              onChange={(event) => {
+                setSignInEmail(event.target.value);
+                if (signInError) setSignInError("");
+              }}
+            />
+            <input
+              className="form-input"
+              placeholder="Password"
+              type="password"
+              value={signInPassword}
+              onChange={(event) => {
+                setSignInPassword(event.target.value);
+                if (signInError) setSignInError("");
+              }}
+            />
             <button className="gold-button" type="submit" disabled={signingIn}>{signingIn ? "Signing In..." : "Sign In"}</button>
           </form>
           <form className="grid gap-4" onSubmit={submitCreate}>
