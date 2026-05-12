@@ -120,6 +120,26 @@ a {
   transform: translateY(-1px);
 }
 
+.nav-profile {
+  display: inline-flex;
+  height: 2.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.75);
+  transition: color 200ms ease, border-color 200ms ease, background 200ms ease, transform 200ms ease;
+}
+
+.nav-profile:hover {
+  border-color: rgba(212, 175, 55, 0.46);
+  background: rgba(212, 175, 55, 0.08);
+  color: #D4AF37;
+  transform: translateY(-1px);
+}
+
 .badge {
   position: absolute;
   right: -0.15rem;

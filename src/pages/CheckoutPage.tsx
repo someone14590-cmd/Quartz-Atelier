@@ -1,10 +1,118 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import type { CartItem } from "../data/products";
+import { emitStorefrontUpdate, STORAGE_KEYS } from "../data/storefront";
+
+type MemberProfile = {
+  name?: string;
+  email?: string;
+};
+
+type Order = {
+  id: string;
+  customer: string;
+  customerEmail?: string;
+  address: string;
+  payment: string;
+  total: number;
+  items: number;
+  status: "Pending" | "Processing" | "Shipped" | "Delivered";
+  date: string;
+};
+
+const PAYMENT_OPTIONS = ["BTC", "ETH", "USDT", "USDC", "LTC", "DOGE"] as const;
+const MEMBER_PROFILE_KEY = "quartz_member_profile";
+
+const canUseStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+const readOrders = (): Order[] => {
+  if (!canUseStorage()) return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.orders);
+    return raw ? (JSON.parse(raw) as Order[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeOrders = (orders: Order[]): boolean => {
+  if (!canUseStorage()) return false;
+  try {
+    localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const readProfile = (): MemberProfile | null => {
+  if (!canUseStorage()) return null;
+  try {
+    const raw = localStorage.getItem(MEMBER_PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as MemberProfile) : null;
+  } catch {
+    return null;
+  }
+};
+
+const createOrderId = (orders: Order[]): string => {
+  const used = new Set(orders.map((order) => order.id));
+  let next = "";
+  do {
+    next = `QZ-${Math.floor(100000 + Math.random() * 900000)}`;
+  } while (used.has(next));
+  return next;
+};
 
 export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setCart: (cart: CartItem[]) => void }) {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const total = subtotal ? subtotal + 35 : 0;
+  const [address, setAddress] = useState("");
+  const [payment, setPayment] = useState<(typeof PAYMENT_OPTIONS)[number]>(PAYMENT_OPTIONS[0]);
+  const [formError, setFormError] = useState("");
   const remove = (id: number) => setCart(cart.filter((item) => item.id !== id));
   const update = (id: number, quantity: number) => setCart(cart.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)));
+
+  const submitOrder = (event: FormEvent) => {
+    event.preventDefault();
+    setFormError("");
+    if (!subtotal) return;
+
+    const trimmedAddress = address.trim();
+    if (!trimmedAddress) {
+      setFormError("Add your shipping address.");
+      return;
+    }
+
+    const existingOrders = readOrders();
+    const profile = readProfile();
+    const customerName = profile?.name?.trim() || profile?.email?.split("@")[0] || "Guest";
+    const customerEmail = profile?.email?.trim() || "";
+    const order: Order = {
+      id: createOrderId(existingOrders),
+      customer: customerName,
+      customerEmail,
+      address: trimmedAddress,
+      payment,
+      total,
+      items: cart.reduce((sum, item) => sum + item.quantity, 0),
+      status: "Pending",
+      date: new Date().toISOString(),
+    };
+
+    const nextOrders = [order, ...existingOrders];
+    if (!writeOrders(nextOrders)) {
+      setFormError("Unable to save your order. Please try again.");
+      return;
+    }
+
+    emitStorefrontUpdate();
+    setCart([]);
+    setAddress("");
+    setPayment(PAYMENT_OPTIONS[0]);
+    alert(`Order ${order.id} created. We will confirm your ${payment} payment soon.`);
+  };
 
   return (
     <main className="min-h-screen bg-black pt-28">
@@ -36,18 +144,36 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
             </div>
           )}
         </div>
-        <form className="h-fit border border-gold/18 bg-white/[0.035] p-6 backdrop-blur-xl" onSubmit={(event) => { event.preventDefault(); alert("Demo checkout complete. Your QUARTZ order is reserved."); setCart([]); }}>
+        <form className="h-fit border border-gold/18 bg-white/[0.035] p-6 backdrop-blur-xl" onSubmit={submitOrder}>
           <h2 className="text-2xl text-white">Order Summary</h2>
           <div className="mt-6 grid gap-3 border-b border-white/10 pb-6 text-white/60">
             <div className="flex justify-between"><span>Subtotal</span><span>${subtotal.toLocaleString()}</span></div>
             <div className="flex justify-between"><span>Insured shipping</span><span>{subtotal ? "$35" : "$0"}</span></div>
-            <div className="flex justify-between text-white"><span>Total</span><span>${(subtotal ? subtotal + 35 : 0).toLocaleString()}</span></div>
+            <div className="flex justify-between text-white"><span>Total</span><span>${total.toLocaleString()}</span></div>
           </div>
           <div className="mt-6 grid gap-3">
-            <input required placeholder="Full name" className="form-input" />
-            <input required placeholder="Email" type="email" className="form-input" />
-            <input required placeholder="Shipping address" className="form-input" />
-            <button disabled={!subtotal} className="gold-button mt-2 disabled:cursor-not-allowed disabled:opacity-40">Complete Order</button>
+            <input
+              required
+              placeholder="Shipping address"
+              value={address}
+              onChange={(event) => {
+                setAddress(event.target.value);
+                if (formError) setFormError("");
+              }}
+              className="form-input"
+            />
+            <select
+              value={payment}
+              onChange={(event) => setPayment(event.target.value as (typeof PAYMENT_OPTIONS)[number])}
+              className="form-input text-white/70"
+              aria-label="Payment method"
+            >
+              {PAYMENT_OPTIONS.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            {formError && <p className="text-xs text-red-300">{formError}</p>}
+            <button disabled={!subtotal || !address.trim()} className="gold-button mt-2 disabled:cursor-not-allowed disabled:opacity-40">Complete Order</button>
           </div>
         </form>
       </section>

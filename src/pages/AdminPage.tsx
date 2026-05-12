@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { aboutContent, contactContent } from "../data/content";
 import { categories, collections, products } from "../data/products";
 import type { Collection, Product } from "../data/products";
-import { emitStorefrontUpdate, loadAboutContent, loadCollections, loadContactContent, loadProducts, STORAGE_KEYS } from "../data/storefront";
+import { emitStorefrontUpdate, loadAboutContent, loadCollections, loadContactContent, loadProducts, STORAGE_KEYS, STOREFRONT_UPDATE_EVENT } from "../data/storefront";
 import { fetchChatMessages, markVisitorMessagesRead, sendChatMessage, subscribeToChatMessages } from "../data/chat";
 import type { ChatMessage } from "../data/chat";
 
@@ -17,6 +17,9 @@ type AdminSection = "products" | "collections" | "orders" | "customers" | "conte
 type Order = {
   id: string;
   customer: string;
+  customerEmail?: string;
+  address?: string;
+  payment?: string;
   total: number;
   items: number;
   status: "Pending" | "Processing" | "Shipped" | "Delivered";
@@ -33,10 +36,50 @@ type Customer = {
 };
 
 const initialOrders: Order[] = [
-  { id: "QZ-1041", customer: "Amara V.", total: 1480, items: 1, status: "Processing", date: "2026-04-28" },
-  { id: "QZ-1042", customer: "Julian R.", total: 920, items: 1, status: "Pending", date: "2026-04-30" },
-  { id: "QZ-1043", customer: "Selene K.", total: 1820, items: 2, status: "Shipped", date: "2026-05-02" },
-  { id: "QZ-1044", customer: "Marco L.", total: 475, items: 1, status: "Delivered", date: "2026-05-04" },
+  {
+    id: "QZ-1041",
+    customer: "Amara V.",
+    customerEmail: "amara@example.com",
+    address: "19 Rue de Rivoli, Paris, FR",
+    payment: "BTC",
+    total: 1480,
+    items: 1,
+    status: "Processing",
+    date: "2026-04-28T14:12:00Z",
+  },
+  {
+    id: "QZ-1042",
+    customer: "Julian R.",
+    customerEmail: "julian@example.com",
+    address: "88 Spring St, New York, NY",
+    payment: "USDC",
+    total: 920,
+    items: 1,
+    status: "Pending",
+    date: "2026-04-30T10:44:00Z",
+  },
+  {
+    id: "QZ-1043",
+    customer: "Selene K.",
+    customerEmail: "selene@example.com",
+    address: "104 Collins St, Melbourne, AU",
+    payment: "ETH",
+    total: 1820,
+    items: 2,
+    status: "Shipped",
+    date: "2026-05-02T19:08:00Z",
+  },
+  {
+    id: "QZ-1044",
+    customer: "Marco L.",
+    customerEmail: "marco@example.com",
+    address: "55 King St, Toronto, CA",
+    payment: "LTC",
+    total: 475,
+    items: 1,
+    status: "Delivered",
+    date: "2026-05-04T16:25:00Z",
+  },
 ];
 
 const initialCustomers: Customer[] = [
@@ -77,6 +120,12 @@ const makeSlug = (value: string) =>
     .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
+
+const formatOrderDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+};
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -134,6 +183,16 @@ export default function AdminPage() {
     setContactDraft(loadContactContent());
     setOrders(readLocal(STORAGE_KEYS.orders, initialOrders));
     setCustomers(readLocal(STORAGE_KEYS.customers, initialCustomers));
+  }, []);
+
+  useEffect(() => {
+    const syncOrders = () => setOrders(readLocal(STORAGE_KEYS.orders, initialOrders));
+    window.addEventListener("storage", syncOrders);
+    window.addEventListener(STOREFRONT_UPDATE_EVENT, syncOrders);
+    return () => {
+      window.removeEventListener("storage", syncOrders);
+      window.removeEventListener(STOREFRONT_UPDATE_EVENT, syncOrders);
+    };
   }, []);
 
   const refreshChat = async () => {
@@ -590,14 +649,20 @@ export default function AdminPage() {
                 <h2 className="text-3xl font-semibold text-white">Orders</h2>
                 <div className="mt-6 grid gap-4">
                   {orders.map((order) => (
-                    <div key={order.id} className="grid gap-4 border border-gold/12 bg-white/[0.03] p-5 md:grid-cols-[1fr_1fr_160px]">
+                    <div key={order.id} className="grid gap-4 border border-gold/12 bg-white/[0.03] p-5 md:grid-cols-[1.1fr_1fr_180px]">
                       <div>
                         <p className="text-sm uppercase tracking-[0.24em] text-white/40">{order.id}</p>
                         <p className="mt-2 text-xl text-white">{order.customer}</p>
-                        <p className="mt-2 text-sm text-white/50">{order.items} items - {order.date}</p>
+                        <p className="mt-2 text-sm text-white/50">{order.items} items</p>
+                        <p className="mt-2 text-sm text-white/50">{order.customerEmail || "No email"}</p>
+                        <p className="mt-2 text-sm text-white/50">Timestamp: {formatOrderDate(order.date)}</p>
                       </div>
-                      <div className="flex items-center justify-between md:justify-start md:gap-6">
+                      <div className="grid content-start gap-2 text-sm text-white/55">
                         <p className="text-lg text-white">${order.total.toLocaleString()}</p>
+                        <p>Payment: <span className="text-white/80">{order.payment || "Not selected"}</span></p>
+                        <p>Ship to: <span className="text-white/80">{order.address || "No address provided"}</span></p>
+                      </div>
+                      <div className="flex flex-col items-end gap-3 text-right text-sm text-white/45 md:items-start md:text-left">
                         <select
                           value={order.status}
                           onChange={(event) =>
@@ -611,9 +676,7 @@ export default function AdminPage() {
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
-                      </div>
-                      <div className="text-right text-sm text-white/45 md:text-left">
-                        Last update: {order.date}
+                        <p>Last update: {formatOrderDate(order.date)}</p>
                       </div>
                     </div>
                   ))}

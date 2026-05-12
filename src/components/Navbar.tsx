@@ -18,6 +18,7 @@ export function Navbar({ cartCount, wishlistCount }: { cartCount: number; wishli
   const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const profileLabel = memberProfile?.name?.trim() || memberProfile?.email?.split("@")[0] || "Account";
   const links: { label: string; path: string }[] = [
     { label: "Home", path: "/" },
     { label: "Shop", path: "/shop" },
@@ -106,12 +107,13 @@ export function Navbar({ cartCount, wishlistCount }: { cartCount: number; wishli
             <div ref={menuRef} className="relative">
               <button
                 onClick={() => setMenuOpen((open) => !open)}
-                className="nav-icon relative"
+                className="nav-profile relative"
                 aria-label="Profile menu"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
               >
                 <Icon name="user" />
+                <span className="text-[0.65rem] uppercase tracking-[0.24em] text-white/70">{profileLabel}</span>
                 {wishlistCount > 0 && <span className="badge">{wishlistCount}</span>}
               </button>
               {menuOpen && (
