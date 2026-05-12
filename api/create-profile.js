@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { getMongoDb } from "./_lib/mongo.js";
 
 const normalizeString = (value) => (typeof value === "string" ? value.trim() : "");
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const passwordHash = crypto.createHash("sha256").update(normalizedPassword).digest("hex");
+    const passwordHash = await bcrypt.hash(normalizedPassword, 12);
 
     await collection.insertOne({
       name: normalizedName,
