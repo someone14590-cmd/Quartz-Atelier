@@ -1,6 +1,20 @@
-import { sql } from "@vercel/postgres";
+import { getMongoDb } from "./_lib/mongo.js";
 
-const normalizeString = (value) => (typeof value === "string" ? value : "");
+const normalizeString = (value) => (typeof value === "string" ? value.trim() : "");
+
+const formatMessage = (doc) => {
+  const createdAt = doc.created_at instanceof Date ? doc.created_at.toISOString() : doc.created_at;
+  return {
+    id: doc._id?.toString?.() ?? "",
+    session_id: doc.session_id ?? "",
+    name: doc.name ?? "",
+    email: doc.email ?? "",
+    message: doc.message ?? "",
+    sender: doc.sender ?? "visitor",
+    status: doc.status ?? "new",
+    created_at: createdAt ?? new Date().toISOString(),
+  };
+};
 
 export default async function handler(req, res) {
   try {
@@ -18,21 +32,14 @@ export default async function handler(req, res) {
         return;
       }
 
-      const result = sessionId
-        ? await sql`
-            SELECT id, session_id, name, email, message, sender, status, created_at
-            FROM chat_messages
-            WHERE session_id = ${sessionId}
-            ORDER BY created_at ASC
-          `
-        : await sql`
-            SELECT id, session_id, name, email, message, sender, status, created_at
-            FROM chat_messages
-            ORDER BY created_at ASC
-          `;
+      const db = await getMongoDb();
+      const collection = db.collection("chat_messages");
+      const filter = sessionId ? { session_id: sessionId } : {};
+      const docs = await collection.find(filter).sort({ created_at: 1 }).toArray();
+      const data = docs.map(formatMessage);
 
       res.setHeader("Cache-Control", "no-store");
-      res.status(200).json({ ok: true, data: result.rows });
+      res.status(200).json({ ok: true, data });
       return;
     }
 
@@ -56,10 +63,17 @@ export default async function handler(req, res) {
       const normalizedName = normalizeString(name);
       const normalizedEmail = normalizeString(email);
 
-      await sql`
-        INSERT INTO chat_messages (session_id, name, email, message, sender, status)
-        VALUES (${normalizedSessionId}, ${normalizedName}, ${normalizedEmail}, ${normalizedMessage}, ${normalizedSender}, ${status})
-      `;
+      const db = await getMongoDb();
+      const collection = db.collection("chat_messages");
+      await collection.insertOne({
+        session_id: normalizedSessionId,
+        name: normalizedName,
+        email: normalizedEmail,
+        message: normalizedMessage,
+        sender: normalizedSender,
+        status,
+        created_at: new Date(),
+      });
 
       res.status(200).json({ ok: true });
       return;
