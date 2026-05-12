@@ -11,6 +11,7 @@ import type { ChatMessage } from "../data/chat";
 const DEV_PASSWORD = "quartz";
 const AUTH_KEY = "quartz_admin_authed";
 const ADMIN_ENDPOINT = "/api/admin-login";
+const CONFIRMATIONS_REQUIRED = 5;
 
 type AdminSection = "products" | "collections" | "orders" | "customers" | "content" | "chat";
 
@@ -27,6 +28,12 @@ type Order = {
   customerEmail?: string;
   address?: string;
   payment?: string;
+  paymentAmount?: number;
+  paymentAddress?: string;
+  paymentStatus?: "unpaid" | "pending" | "confirmed";
+  paymentTx?: string;
+  paymentConfirmations?: number;
+  paymentCheckedAt?: string;
   total: number;
   items: number;
   lineItems?: OrderLineItem[];
@@ -50,6 +57,9 @@ const initialOrders: Order[] = [
     customerEmail: "amara@example.com",
     address: "19 Rue de Rivoli, Paris, FR",
     payment: "BTC",
+    paymentAmount: 1480,
+    paymentStatus: "confirmed",
+    paymentConfirmations: 5,
     total: 1480,
     items: 1,
     lineItems: [
@@ -64,6 +74,9 @@ const initialOrders: Order[] = [
     customerEmail: "julian@example.com",
     address: "88 Spring St, New York, NY",
     payment: "USDC",
+    paymentAmount: 920,
+    paymentStatus: "confirmed",
+    paymentConfirmations: 5,
     total: 920,
     items: 1,
     lineItems: [
@@ -78,6 +91,9 @@ const initialOrders: Order[] = [
     customerEmail: "selene@example.com",
     address: "104 Collins St, Melbourne, AU",
     payment: "ETH",
+    paymentAmount: 1820,
+    paymentStatus: "confirmed",
+    paymentConfirmations: 5,
     total: 1820,
     items: 2,
     lineItems: [
@@ -93,6 +109,9 @@ const initialOrders: Order[] = [
     customerEmail: "marco@example.com",
     address: "55 King St, Toronto, CA",
     payment: "LTC",
+    paymentAmount: 475,
+    paymentStatus: "confirmed",
+    paymentConfirmations: 5,
     total: 475,
     items: 1,
     lineItems: [
@@ -165,6 +184,7 @@ export default function AdminPage() {
   const [contactDraft, setContactDraft] = useState(loadContactContent());
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [checkingPayments, setCheckingPayments] = useState(false);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [adminReply, setAdminReply] = useState("");
   const [chatError, setChatError] = useState("");
@@ -226,6 +246,81 @@ export default function AdminPage() {
 
   const toggleOrderItems = (orderId: string) => {
     setExpandedOrderId((current) => (current === orderId ? null : orderId));
+  };
+
+  const persistOrders = (updater: (current: Order[]) => Order[]) => {
+    setOrders((current) => {
+      const next = updater(current);
+      try {
+        localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(next));
+        emitStorefrontUpdate();
+      } catch {
+        // Ignore storage failures for now.
+      }
+      return next;
+    });
+  };
+
+  const checkPayment = async (order: Order, silent = false) => {
+    if (!order.payment || !order.paymentAmount || !order.paymentAddress) {
+      if (!silent) pushNotice("Payment details missing for this order.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/check-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coin: order.payment,
+          amount: order.paymentAmount,
+          address: order.paymentAddress,
+          orderDate: order.date,
+          confirmationsRequired: CONFIRMATIONS_REQUIRED,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; data?: { status: Order["paymentStatus"]; confirmations: number; txid?: string; checkedAt: string; detectedAt?: string }; error?: string }
+        | null;
+
+      if (!response.ok || !payload?.ok || !payload.data) {
+        if (!silent) pushNotice(payload?.error ?? "Payment check failed.");
+        return;
+      }
+
+      const result = payload.data;
+      persistOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                paymentStatus: result.status ?? item.paymentStatus,
+                paymentConfirmations: result.confirmations ?? item.paymentConfirmations,
+                paymentTx: result.txid ?? item.paymentTx,
+                paymentCheckedAt: result.checkedAt ?? item.paymentCheckedAt,
+              }
+            : item
+        )
+      );
+
+      if (!silent) pushNotice(`Payment check complete: ${result.status ?? "unpaid"}.`);
+    } catch {
+      if (!silent) pushNotice("Payment check failed.");
+    }
+  };
+
+  const checkAllPayments = async () => {
+    if (checkingPayments) return;
+    setCheckingPayments(true);
+    const snapshot = [...orders];
+    for (const order of snapshot) {
+      if (order.paymentStatus === "confirmed") continue;
+      // eslint-disable-next-line no-await-in-loop
+      await checkPayment(order, true);
+    }
+    setCheckingPayments(false);
+    pushNotice("Payment checks completed.");
   };
 
   useEffect(() => {
@@ -696,6 +791,12 @@ export default function AdminPage() {
                       />
                       <p className="text-sm text-white/55">Applies to new checkout totals. Save Drafts to publish.</p>
                     </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button onClick={checkAllPayments} className="ghost-button" disabled={checkingPayments}>
+                        {checkingPayments ? "Checking Payments..." : "Check Payments"}
+                      </button>
+                      <p className="text-xs text-white/45">Uses Blockchair, requires {CONFIRMATIONS_REQUIRED} confirmations.</p>
+                    </div>
                   </div>
                   {orders.map((order) => (
                     <div key={order.id} className="grid gap-4 border border-gold/12 bg-white/[0.03] p-5 md:grid-cols-[1.1fr_1fr_180px]">
@@ -709,6 +810,13 @@ export default function AdminPage() {
                       <div className="grid content-start gap-2 text-sm text-white/55">
                         <p className="text-lg text-white">${order.total.toLocaleString()}</p>
                         <p>Payment: <span className="text-white/80">{order.payment || "Not selected"}</span></p>
+                        <p>Amount: <span className="text-white/80">{order.paymentAmount ? `${order.paymentAmount} ${order.payment ?? ""}` : "Not set"}</span></p>
+                        {order.paymentAddress && (
+                          <p className="break-all">Address: <span className="text-white/80">{order.paymentAddress}</span></p>
+                        )}
+                        <p>Status: <span className="text-white/80">{order.paymentStatus ?? "unpaid"}</span>{order.paymentConfirmations ? ` (${order.paymentConfirmations}/${CONFIRMATIONS_REQUIRED})` : ""}</p>
+                        {order.paymentTx && <p>Tx: <span className="text-white/80">{order.paymentTx}</span></p>}
+                        {order.paymentCheckedAt && <p>Checked: <span className="text-white/80">{formatOrderDate(order.paymentCheckedAt)}</span></p>}
                         <p>Ship to: <span className="text-white/80">{order.address || "No address provided"}</span></p>
                         <button
                           type="button"
@@ -746,6 +854,7 @@ export default function AdminPage() {
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
+                        <button onClick={() => checkPayment(order)} className="ghost-button">Check Payment</button>
                         <p>Last update: {formatOrderDate(order.date)}</p>
                       </div>
                     </div>

@@ -23,6 +23,12 @@ type Order = {
   customerEmail?: string;
   address: string;
   payment: string;
+  paymentAmount: number;
+  paymentAddress: string;
+  paymentStatus: "unpaid" | "pending" | "confirmed";
+  paymentTx?: string;
+  paymentConfirmations?: number;
+  paymentCheckedAt?: string;
   total: number;
   items: number;
   lineItems?: OrderLineItem[];
@@ -34,6 +40,91 @@ const PAYMENT_OPTIONS = ["BTC", "ETH", "USDT", "USDC", "LTC", "DOGE"] as const;
 const MEMBER_AUTH_KEY = "quartz_member_authed";
 const MEMBER_PROFILE_KEY = "quartz_member_profile";
 const MEMBER_EVENT = "quartz:member-auth";
+
+const PAYMENT_ENV = import.meta.env as Record<string, string | undefined>;
+
+const readEnvNumber = (key: string, fallback: number) => {
+  const raw = PAYMENT_ENV[key];
+  const value = raw ? Number(raw) : Number.NaN;
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+const readEnvString = (key: string) => {
+  const raw = PAYMENT_ENV[key];
+  return typeof raw === "string" ? raw.trim() : "";
+};
+
+const roundToDecimals = (value: number, decimals: number) => Number(value.toFixed(decimals));
+
+const toBaseUnitsString = (value: number, decimals: number) => {
+  const [whole, fraction = ""] = value.toFixed(decimals).split(".");
+  const paddedFraction = `${fraction}${"0".repeat(decimals)}`.slice(0, decimals);
+  return `${whole}${paddedFraction}`;
+};
+
+const ERC20_CONTRACTS = {
+  USDT: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+  USDC: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+};
+
+const buildPaymentUri = (coin: (typeof PAYMENT_OPTIONS)[number], address: string, amount: number, amountLabel: string) => {
+  if (!address || !amount) return "";
+  switch (coin) {
+    case "BTC":
+      return `bitcoin:${address}?amount=${amountLabel}`;
+    case "LTC":
+      return `litecoin:${address}?amount=${amountLabel}`;
+    case "DOGE":
+      return `dogecoin:${address}?amount=${amountLabel}`;
+    case "ETH": {
+      const wei = toBaseUnitsString(amount, 18);
+      return `ethereum:${address}?value=${wei}`;
+    }
+    case "USDT": {
+      const value = toBaseUnitsString(amount, 6);
+      return `ethereum:${ERC20_CONTRACTS.USDT}/transfer?address=${address}&uint256=${value}`;
+    }
+    case "USDC": {
+      const value = toBaseUnitsString(amount, 6);
+      return `ethereum:${ERC20_CONTRACTS.USDC}/transfer?address=${address}&uint256=${value}`;
+    }
+    default:
+      return `${address}?amount=${amountLabel}`;
+  }
+};
+
+const PAYMENT_CONFIG = {
+  BTC: {
+    address: readEnvString("VITE_PAY_ADDR_BTC"),
+    usdRate: readEnvNumber("VITE_PAY_RATE_BTC", 0),
+    decimals: 8,
+  },
+  ETH: {
+    address: readEnvString("VITE_PAY_ADDR_ETH"),
+    usdRate: readEnvNumber("VITE_PAY_RATE_ETH", 0),
+    decimals: 6,
+  },
+  USDT: {
+    address: readEnvString("VITE_PAY_ADDR_USDT"),
+    usdRate: readEnvNumber("VITE_PAY_RATE_USDT", 1),
+    decimals: 2,
+  },
+  USDC: {
+    address: readEnvString("VITE_PAY_ADDR_USDC"),
+    usdRate: readEnvNumber("VITE_PAY_RATE_USDC", 1),
+    decimals: 2,
+  },
+  LTC: {
+    address: readEnvString("VITE_PAY_ADDR_LTC"),
+    usdRate: readEnvNumber("VITE_PAY_RATE_LTC", 0),
+    decimals: 8,
+  },
+  DOGE: {
+    address: readEnvString("VITE_PAY_ADDR_DOGE"),
+    usdRate: readEnvNumber("VITE_PAY_RATE_DOGE", 0),
+    decimals: 8,
+  },
+} as const;
 
 const canUseStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
@@ -88,6 +179,17 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
   const [authed, setAuthed] = useState(false);
   const remove = (id: number) => setCart(cart.filter((item) => item.id !== id));
   const update = (id: number, quantity: number) => setCart(cart.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)));
+  const paymentConfig = PAYMENT_CONFIG[payment];
+  const paymentAddress = paymentConfig.address;
+  const paymentAmount = total && paymentConfig.usdRate > 0
+    ? roundToDecimals(total / paymentConfig.usdRate, paymentConfig.decimals)
+    : 0;
+  const amountLabel = paymentAmount ? paymentAmount.toFixed(paymentConfig.decimals) : "";
+  const paymentReady = Boolean(paymentAddress) && paymentAmount > 0;
+  const paymentUri = paymentReady ? buildPaymentUri(payment, paymentAddress, paymentAmount, amountLabel) : "";
+  const qrUrl = paymentUri
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(paymentUri)}`
+    : "";
 
   useEffect(() => {
     const syncShipping = () => setShippingCharge(loadShippingCharge());
@@ -119,6 +221,10 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
       setFormError("Sign in to place an order.");
       return;
     }
+    if (!paymentReady) {
+      setFormError(`Payment address not configured for ${payment}.`);
+      return;
+    }
 
     const trimmedAddress = address.trim();
     if (!trimmedAddress) {
@@ -136,6 +242,9 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
       customerEmail,
       address: trimmedAddress,
       payment,
+      paymentAmount,
+      paymentAddress,
+      paymentStatus: "unpaid",
       total,
       items: cart.reduce((sum, item) => sum + item.quantity, 0),
       lineItems: cart.map((item) => ({
@@ -229,8 +338,33 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
                 <option key={option} value={option}>{option}</option>
               ))}
             </select>
+            {authed && (
+              paymentReady ? (
+                <div className="border border-white/10 bg-white/[0.03] p-3 text-xs text-white/65">
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-white/45">Payment Instructions</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[220px_1fr] sm:items-center">
+                    {qrUrl && (
+                      <img
+                        src={qrUrl}
+                        alt={`${payment} payment QR code`}
+                        className="h-[220px] w-[220px] border border-white/10 bg-black p-2"
+                        loading="lazy"
+                      />
+                    )}
+                    <div>
+                      <p>Send exactly <span className="text-white">{amountLabel}</span> {payment} to:</p>
+                      <p className="mt-2 break-all text-white/45">{paymentAddress}</p>
+                      <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-white/45">URI</p>
+                      <p className="mt-1 break-all text-white/45">{paymentUri}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-red-300">Payment address not configured for {payment}.</p>
+              )
+            )}
             {formError && <p className="text-xs text-red-300">{formError}</p>}
-            <button disabled={!subtotal || !address.trim() || !authed} className="gold-button mt-2 disabled:cursor-not-allowed disabled:opacity-40">Complete Order</button>
+            <button disabled={!subtotal || !address.trim() || !authed || !paymentReady} className="gold-button mt-2 disabled:cursor-not-allowed disabled:opacity-40">Complete Order</button>
           </div>
         </form>
       </section>
