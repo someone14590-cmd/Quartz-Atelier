@@ -1,0 +1,189 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #D4AF37;
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: #0A0A0A;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(212, 175, 55, 0.09), transparent 28rem),
+    #0A0A0A;
+  color: white;
+  font-family: var(--font-sans);
+}
+
+button,
+a,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.section-shell {
+  width: min(100% - 2.5rem, 80rem);
+  margin-inline: auto;
+  padding-block: 6.5rem;
+}
+
+.section-title {
+  color: white;
+  font-size: clamp(2.8rem, 7vw, 5.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.065em;
+  font-weight: 600;
+}
+
+.eyebrow {
+  color: rgba(212, 175, 55, 0.82);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  margin-bottom: 1rem;
+}
+
+.gold-button {
+  display: inline-flex;
+  min-width: 11rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(212, 175, 55, 0.82);
+  background: linear-gradient(135deg, #f0d77b, #D4AF37 45%, #9a761a);
+  color: #080808;
+  padding: 0.95rem 1.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  box-shadow: 0 0 34px rgba(212, 175, 55, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+}
+
+.gold-button:hover {
+  transform: translateY(-2px);
+  filter: saturate(1.05);
+  box-shadow: 0 0 54px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.ghost-button {
+  display: inline-flex;
+  min-width: 11rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.82);
+  padding: 0.95rem 1.5rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  backdrop-filter: blur(20px);
+  transition: border-color 220ms ease, color 220ms ease, transform 220ms ease, background 220ms ease;
+}
+
+.ghost-button:hover {
+  border-color: rgba(212, 175, 55, 0.6);
+  color: #D4AF37;
+  transform: translateY(-2px);
+  background: rgba(212, 175, 55, 0.07);
+}
+
+.nav-icon {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.75);
+  transition: color 200ms ease, border-color 200ms ease, background 200ms ease, transform 200ms ease;
+}
+
+.nav-icon:hover {
+  border-color: rgba(212, 175, 55, 0.46);
+  background: rgba(212, 175, 55, 0.08);
+  color: #D4AF37;
+  transform: translateY(-1px);
+}
+
+.badge {
+  position: absolute;
+  right: -0.15rem;
+  top: -0.15rem;
+  display: grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border-radius: 999px;
+  background: #D4AF37;
+  color: black;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.form-input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: white;
+  outline: none;
+  padding: 0.95rem 1rem;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+.form-input:focus {
+  border-color: rgba(212, 175, 55, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-image:
+    radial-gradient(circle, rgba(212, 175, 55, 0.36) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.22) 0 1px, transparent 1.5px);
+  background-position: 0 0, 38px 64px;
+  background-size: 140px 140px, 190px 190px;
+  mask-image: radial-gradient(circle at 50% 38%, black, transparent 76%);
+  animation: particle-drift 18s linear infinite;
+}
+
+@keyframes particle-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-140px, 140px, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  .section-shell {
+    width: min(100% - 1.5rem, 80rem);
+    padding-block: 4.5rem;
+  }
+
+  .gold-button,
+  .ghost-button {
+    width: 100%;
+  }
+}
