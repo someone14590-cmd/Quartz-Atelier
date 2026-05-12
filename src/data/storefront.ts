@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   about: "quartz_admin_about",
   contact: "quartz_admin_contact",
   orders: "quartz_admin_orders",
+  customers: "quartz_admin_customers",
 };
 
 export const STOREFRONT_UPDATE_EVENT = "quartz:storefront-update";

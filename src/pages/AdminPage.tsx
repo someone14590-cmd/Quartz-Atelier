@@ -89,7 +89,7 @@ export default function AdminPage() {
   const [productDrafts, setProductDrafts] = useState<Product[]>(() => loadProducts());
   const [collectionDrafts, setCollectionDrafts] = useState<Collection[]>(() => loadCollections());
   const [orders, setOrders] = useState<Order[]>(() => readLocal(STORAGE_KEYS.orders, initialOrders));
-  const [customers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>(() => readLocal(STORAGE_KEYS.customers, initialCustomers));
   const [aboutDraft, setAboutDraft] = useState(loadAboutContent());
   const [contactDraft, setContactDraft] = useState(loadContactContent());
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -133,6 +133,7 @@ export default function AdminPage() {
     setAboutDraft(loadAboutContent());
     setContactDraft(loadContactContent());
     setOrders(readLocal(STORAGE_KEYS.orders, initialOrders));
+    setCustomers(readLocal(STORAGE_KEYS.customers, initialCustomers));
   }, []);
 
   const refreshChat = async () => {
@@ -271,6 +272,7 @@ export default function AdminPage() {
       localStorage.setItem(STORAGE_KEYS.about, JSON.stringify(aboutDraft));
       localStorage.setItem(STORAGE_KEYS.contact, JSON.stringify(contactDraft));
       localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
+      localStorage.setItem(STORAGE_KEYS.customers, JSON.stringify(customers));
       emitStorefrontUpdate();
       pushNotice("Drafts saved locally.");
     } catch {
@@ -300,17 +302,51 @@ export default function AdminPage() {
     setCollectionDrafts((current) => current.filter((item) => item.slug !== slug));
   };
 
+  const updateCustomer = (id: string, patch: Partial<Customer>) => {
+    setCustomers((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+
+  const addCustomer = () => {
+    setCustomers((current) => {
+      const maxId = current.reduce((max, item) => {
+        const match = item.id.match(/\d+/);
+        const value = match ? Number(match[0]) : 0;
+        return Math.max(max, value);
+      }, 0);
+      const nextId = `C-${String(maxId + 1).padStart(3, "0")}`;
+      const today = new Date().toISOString().slice(0, 10);
+      return [
+        {
+          id: nextId,
+          name: "New Client",
+          email: "",
+          tier: "Member",
+          lastOrder: today,
+          lifetime: 0,
+        },
+        ...current,
+      ];
+    });
+    pushNotice("Customer added. Save drafts to apply.");
+  };
+
+  const removeCustomer = (id: string) => {
+    setCustomers((current) => current.filter((item) => item.id !== id));
+  };
+
   const resetDrafts = () => {
     setProductDrafts(cloneProducts(products));
     setCollectionDrafts(cloneCollections(collections));
     setAboutDraft(aboutContent);
     setContactDraft(contactContent);
     setOrders(initialOrders);
+    setCustomers(initialCustomers);
     localStorage.removeItem(STORAGE_KEYS.products);
     localStorage.removeItem(STORAGE_KEYS.collections);
     localStorage.removeItem(STORAGE_KEYS.about);
     localStorage.removeItem(STORAGE_KEYS.contact);
     localStorage.removeItem(STORAGE_KEYS.orders);
+    localStorage.removeItem(STORAGE_KEYS.customers);
     emitStorefrontUpdate();
     pushNotice("Drafts reset.");
   };
@@ -587,28 +623,60 @@ export default function AdminPage() {
 
             {active === "customers" && (
               <section className="border border-white/10 bg-white/[0.02] p-6">
-                <p className="eyebrow">Clients</p>
-                <h2 className="text-3xl font-semibold text-white">Customers</h2>
-                <div className="mt-6 grid gap-4">
+                <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="eyebrow">Clients</p>
+                    <h2 className="text-3xl font-semibold text-white">Customers</h2>
+                    <p className="mt-2 text-sm text-white/50">Add, edit, or remove customer details. Save drafts to keep changes.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button onClick={addCustomer} className="ghost-button">Add Customer</button>
+                  </div>
+                </div>
+                <div className="grid gap-4">
                   {customers.map((customer) => (
-                    <div key={customer.id} className="grid gap-4 border border-gold/12 bg-white/[0.03] p-5 md:grid-cols-[1.2fr_1fr_160px]">
-                      <div>
-                        <p className="text-sm uppercase tracking-[0.24em] text-white/40">{customer.id}</p>
-                        <p className="mt-2 text-xl text-white">{customer.name}</p>
-                        <p className="mt-2 text-sm text-white/50">{customer.email}</p>
+                    <div key={customer.id} className="grid gap-4 border border-gold/12 bg-white/[0.03] p-5">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <input
+                          value={customer.name}
+                          onChange={(event) => updateCustomer(customer.id, { name: event.target.value })}
+                          className="form-input"
+                          placeholder="Name"
+                        />
+                        <input
+                          value={customer.email}
+                          onChange={(event) => updateCustomer(customer.id, { email: event.target.value })}
+                          className="form-input"
+                          placeholder="Email"
+                          type="email"
+                        />
+                        <input
+                          value={customer.tier}
+                          onChange={(event) => updateCustomer(customer.id, { tier: event.target.value })}
+                          className="form-input"
+                          placeholder="Tier"
+                        />
+                        <input
+                          value={customer.lastOrder}
+                          onChange={(event) => updateCustomer(customer.id, { lastOrder: event.target.value })}
+                          className="form-input"
+                          type="date"
+                        />
+                        <input
+                          value={customer.lifetime}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            updateCustomer(customer.id, { lifetime: Number.isFinite(value) ? value : 0 });
+                          }}
+                          className="form-input"
+                          placeholder="Lifetime spend"
+                          type="number"
+                          min="0"
+                        />
                       </div>
-                      <div className="flex items-center justify-between md:justify-start md:gap-6">
-                        <div>
-                          <p className="text-sm text-white/45">Tier</p>
-                          <p className="text-lg text-white">{customer.tier}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-white/45">Lifetime</p>
-                          <p className="text-lg text-white">${customer.lifetime.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm text-white/45 md:text-left">
-                        Last order: {customer.lastOrder}
+                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-white/40">
+                        <span>{customer.id}</span>
+                        <button onClick={() => removeCustomer(customer.id)} className="text-gold hover:text-gold/80">Remove</button>
                       </div>
                     </div>
                   ))}
