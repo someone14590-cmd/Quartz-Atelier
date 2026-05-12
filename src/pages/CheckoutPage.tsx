@@ -93,6 +93,9 @@ const buildPaymentUri = (coin: (typeof PAYMENT_OPTIONS)[number], address: string
   }
 };
 
+const buildQrUrl = (uri: string) =>
+  uri ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(uri)}` : "";
+
 const PAYMENT_CONFIG = {
   BTC: {
     address: readEnvString("VITE_PAY_ADDR_BTC"),
@@ -177,6 +180,14 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
   const [payment, setPayment] = useState<(typeof PAYMENT_OPTIONS)[number]>(PAYMENT_OPTIONS[0]);
   const [formError, setFormError] = useState("");
   const [authed, setAuthed] = useState(false);
+  const [confirmation, setConfirmation] = useState<{
+    id: string;
+    payment: (typeof PAYMENT_OPTIONS)[number];
+    amountLabel: string;
+    address: string;
+    uri: string;
+    qrUrl: string;
+  } | null>(null);
   const remove = (id: number) => setCart(cart.filter((item) => item.id !== id));
   const update = (id: number, quantity: number) => setCart(cart.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)));
   const paymentConfig = PAYMENT_CONFIG[payment];
@@ -187,9 +198,7 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
   const amountLabel = paymentAmount ? paymentAmount.toFixed(paymentConfig.decimals) : "";
   const paymentReady = Boolean(paymentAddress) && paymentAmount > 0;
   const paymentUri = paymentReady ? buildPaymentUri(payment, paymentAddress, paymentAmount, amountLabel) : "";
-  const qrUrl = paymentUri
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(paymentUri)}`
-    : "";
+  const qrUrl = buildQrUrl(paymentUri);
 
   useEffect(() => {
     const syncShipping = () => setShippingCharge(loadShippingCharge());
@@ -263,11 +272,18 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
       return;
     }
 
+    setConfirmation({
+      id: order.id,
+      payment,
+      amountLabel,
+      address: paymentAddress,
+      uri: paymentUri,
+      qrUrl: buildQrUrl(paymentUri),
+    });
     emitStorefrontUpdate();
     setCart([]);
     setAddress("");
     setPayment(PAYMENT_OPTIONS[0]);
-    alert(`Order ${order.id} created. We will confirm your ${payment} payment soon.`);
   };
 
   return (
@@ -308,6 +324,31 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
             <div className="flex justify-between text-white"><span>Total</span><span>${total.toLocaleString()}</span></div>
           </div>
           <div className="mt-6 grid gap-3">
+            {confirmation && (
+              <div className="border border-gold/25 bg-white/[0.04] p-4 text-xs text-white/70">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-gold/80">Order Complete</p>
+                <p className="mt-2 text-white">Order <span className="text-gold">{confirmation.id}</span> created. Complete payment below.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[220px_1fr] sm:items-center">
+                  {confirmation.qrUrl && (
+                    <img
+                      src={confirmation.qrUrl}
+                      alt={`${confirmation.payment} payment QR code`}
+                      className="h-[220px] w-[220px] border border-white/10 bg-black p-2"
+                      loading="lazy"
+                    />
+                  )}
+                  <div>
+                    <p>Send exactly <span className="text-white">{confirmation.amountLabel}</span> {confirmation.payment} to:</p>
+                    <p className="mt-2 break-all text-white/50">{confirmation.address}</p>
+                    <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-white/45">URI</p>
+                    <p className="mt-1 break-all text-white/50">{confirmation.uri}</p>
+                    <button type="button" onClick={() => navigate("/orders")} className="mt-3 text-gold/80 hover:text-gold">
+                      View Order Status
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {!authed && (
               <div className="border border-white/10 bg-white/[0.03] p-3 text-sm text-white/60">
                 Sign in to complete checkout.
