@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import type { CartItem } from "../data/products";
 import { emitStorefrontUpdate, loadShippingCharge, STORAGE_KEYS, STOREFRONT_UPDATE_EVENT } from "../data/storefront";
 
@@ -30,7 +31,9 @@ type Order = {
 };
 
 const PAYMENT_OPTIONS = ["BTC", "ETH", "USDT", "USDC", "LTC", "DOGE"] as const;
+const MEMBER_AUTH_KEY = "quartz_member_authed";
 const MEMBER_PROFILE_KEY = "quartz_member_profile";
+const MEMBER_EVENT = "quartz:member-auth";
 
 const canUseStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
@@ -74,6 +77,7 @@ const createOrderId = (orders: Order[]): string => {
 };
 
 export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setCart: (cart: CartItem[]) => void }) {
+  const navigate = useNavigate();
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const [shippingCharge, setShippingCharge] = useState(() => loadShippingCharge());
   const shippingCost = subtotal ? shippingCharge : 0;
@@ -81,6 +85,7 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
   const [address, setAddress] = useState("");
   const [payment, setPayment] = useState<(typeof PAYMENT_OPTIONS)[number]>(PAYMENT_OPTIONS[0]);
   const [formError, setFormError] = useState("");
+  const [authed, setAuthed] = useState(false);
   const remove = (id: number) => setCart(cart.filter((item) => item.id !== id));
   const update = (id: number, quantity: number) => setCart(cart.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)));
 
@@ -94,10 +99,26 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
     };
   }, []);
 
+  useEffect(() => {
+    const syncAuth = () => setAuthed(localStorage.getItem(MEMBER_AUTH_KEY) === "true");
+    if (typeof window === "undefined") return undefined;
+    syncAuth();
+    window.addEventListener("storage", syncAuth);
+    window.addEventListener(MEMBER_EVENT, syncAuth);
+    return () => {
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener(MEMBER_EVENT, syncAuth);
+    };
+  }, []);
+
   const submitOrder = (event: FormEvent) => {
     event.preventDefault();
     setFormError("");
     if (!subtotal) return;
+    if (!authed) {
+      setFormError("Sign in to place an order.");
+      return;
+    }
 
     const trimmedAddress = address.trim();
     if (!trimmedAddress) {
@@ -178,6 +199,14 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
             <div className="flex justify-between text-white"><span>Total</span><span>${total.toLocaleString()}</span></div>
           </div>
           <div className="mt-6 grid gap-3">
+            {!authed && (
+              <div className="border border-white/10 bg-white/[0.03] p-3 text-sm text-white/60">
+                Sign in to complete checkout.
+                <button type="button" onClick={() => navigate("/auth")} className="ml-3 text-gold/80 hover:text-gold">
+                  Sign In
+                </button>
+              </div>
+            )}
             <input
               required
               placeholder="Shipping address"
@@ -187,19 +216,21 @@ export default function CheckoutPage({ cart, setCart }: { cart: CartItem[]; setC
                 if (formError) setFormError("");
               }}
               className="form-input"
+              disabled={!authed}
             />
             <select
               value={payment}
               onChange={(event) => setPayment(event.target.value as (typeof PAYMENT_OPTIONS)[number])}
               className="form-input form-select text-white/80"
               aria-label="Payment method"
+              disabled={!authed}
             >
               {PAYMENT_OPTIONS.map((option) => (
                 <option key={option} value={option}>{option}</option>
               ))}
             </select>
             {formError && <p className="text-xs text-red-300">{formError}</p>}
-            <button disabled={!subtotal || !address.trim()} className="gold-button mt-2 disabled:cursor-not-allowed disabled:opacity-40">Complete Order</button>
+            <button disabled={!subtotal || !address.trim() || !authed} className="gold-button mt-2 disabled:cursor-not-allowed disabled:opacity-40">Complete Order</button>
           </div>
         </form>
       </section>

@@ -164,7 +164,7 @@ export default function AdminPage() {
   const [aboutDraft, setAboutDraft] = useState(loadAboutContent());
   const [contactDraft, setContactDraft] = useState(loadContactContent());
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [adminReply, setAdminReply] = useState("");
   const [chatError, setChatError] = useState("");
@@ -225,7 +225,7 @@ export default function AdminPage() {
   };
 
   const toggleOrderItems = (orderId: string) => {
-    setExpandedOrders((current) => ({ ...current, [orderId]: !current[orderId] }));
+    setExpandedOrderId((current) => (current === orderId ? null : orderId));
   };
 
   useEffect(() => {
@@ -715,9 +715,9 @@ export default function AdminPage() {
                           onClick={() => toggleOrderItems(order.id)}
                           className="mt-2 text-left text-[10px] uppercase tracking-[0.22em] text-gold/80 hover:text-gold"
                         >
-                          {expandedOrders[order.id] ? "Hide items" : `Items (${order.items})`}
+                          {expandedOrderId === order.id ? "Hide items" : `Items (${order.items})`}
                         </button>
-                        {expandedOrders[order.id] && (
+                        {expandedOrderId === order.id && (
                           order.lineItems && order.lineItems.length > 0 ? (
                             <div className="mt-2 grid gap-1">
                               {order.lineItems.map((item) => (
