@@ -17,6 +17,7 @@ import ProductPage from "./pages/ProductPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import AuthPage from "./pages/AuthPage";
 import AdminPage from "./pages/AdminPage";
+import OrdersPage from "./pages/OrdersPage";
 
 export default function App() {
   const location = useLocation();
@@ -115,6 +116,7 @@ export default function App() {
             <Route path="/product/:productId" element={<ProductPage {...shared} />} />
             <Route path="/checkout" element={<CheckoutPage cart={cart} setCart={setCart} />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

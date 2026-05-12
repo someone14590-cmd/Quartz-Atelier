@@ -16,11 +16,13 @@ export default function AuthPage() {
 
   const MEMBER_AUTH_KEY = "quartz_member_authed";
   const MEMBER_PROFILE_KEY = "quartz_member_profile";
+  const MEMBER_EVENT = "quartz:member-auth";
 
   const storeMemberSession = (profile: { name?: string; email: string }) => {
     if (typeof window === "undefined") return;
     localStorage.setItem(MEMBER_AUTH_KEY, "true");
     localStorage.setItem(MEMBER_PROFILE_KEY, JSON.stringify({ name: profile.name ?? "", email: profile.email }));
+    window.dispatchEvent(new Event(MEMBER_EVENT));
   };
 
   const submitSignIn = async (event: FormEvent) => {
